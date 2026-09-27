@@ -70,7 +70,7 @@ class BPETokenizer:
         words = Counter(w for part in parts for w in tok.pretokenize(part))
         chunks = {tuple(w.encode("utf-8")): f for w, f in words.items()}
         merges = {}
-        for new_id in range(256, vocab_size):
+        for new_id in range(256, vocab_size - len(special_tokens)):
             counts = get_pair_counts(chunks)
             if not counts:
                 break
