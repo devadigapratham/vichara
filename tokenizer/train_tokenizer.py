@@ -17,7 +17,7 @@ from tokenizer.bpe import BPETokenizer
 EOT = "<|endoftext|>"
 
 
-def show(tok, BPETokenizer, i: int) -> str:
+def show(tok: BPETokenizer, i: int) -> str:
     return repr(tok.vocab[i].decode("utf-8", errors="replace"))
 
 
