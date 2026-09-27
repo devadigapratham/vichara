@@ -7,11 +7,11 @@ FOUNDATIONS
 ├── [x] Language modeling as probability (chain rule, next-token prediction)
 ├── [x] Maximum likelihood, negative log-likelihood, cross-entropy
 ├── [x] Perplexity
-├── [ ] Gradients, chain rule over tensors, autograd
+├── [~] Gradients, chain rule over tensors, autograd
 └── [ ] Optimization (SGD, Adam, AdamW, schedules)
 
 LANGUAGE MODELS
-├── [~] Tokenization (bytes, Unicode, BPE)
+├── [x] Tokenization (bytes, Unicode, BPE, special tokens)
 ├── [ ] Embeddings
 ├── [ ] Attention (causal, multi-head)
 ├── [ ] Transformer block (RMSNorm, RoPE, SwiGLU, residuals)
