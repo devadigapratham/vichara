@@ -20,24 +20,35 @@ def test_pair_counts_weighted_by_frequency():
 
 def test_worked_example():
     tok = BPETokenizer.train("aaabdaaabac", vocab_size=259)
-    assert list(tok.merges) == [(A, A), (256, A), (257, B)]  # "aa", then "aaa", then "aaab"
+    assert list(tok.merges) == [
+        (A, A),
+        (256, A),
+        (257, B),
+    ]  # "aa", then "aaa", then "aaab"
     assert tok.encode("aaabdaaabac") == [258, D, 258, A, C]  # 11 bytes -> 5 tokens
 
 
-@pytest.mark.parametrize("text", [
-    "",
-    "hello world",
-    "Hello, wörld! 🙂 naïve  café\n\tdon't  x_y 123",
-    "日本語のテキスト",
-    "   leading and trailing spaces   ",
-])
+@pytest.mark.parametrize(
+    "text",
+    [
+        "",
+        "hello world",
+        "Hello, wörld! 🙂 naïve  café\n\tdon't  x_y 123",
+        "日本語のテキスト",
+        "   leading and trailing spaces   ",
+    ],
+)
 def test_roundtrip(text):
-    tok = BPETokenizer.train("the cat sat on the mat. the dog sat on the log.", vocab_size=300)
+    tok = BPETokenizer.train(
+        "the cat sat on the mat. the dog sat on the log.", vocab_size=300
+    )
     assert tok.decode(tok.encode(text)) == text
 
 
 def test_save_load(tmp_path):
-    tok = BPETokenizer.train("the cat sat on the mat. the dog sat on the log.", vocab_size=300)
+    tok = BPETokenizer.train(
+        "the cat sat on the mat. the dog sat on the log.", vocab_size=300
+    )
     tok.save(tmp_path / "tok.json")
     loaded = BPETokenizer.load(tmp_path / "tok.json")
     text = "the cat sat on the log"
@@ -87,4 +98,14 @@ def test_save_load_keeps_special_tokens(tok_with_eot, tmp_path):
     loaded = BPETokenizer.load(tmp_path / "tok.json")
     assert loaded.special_tokens == tok_with_eot.special_tokens
     text = f"a{EOT}b"
-    assert loaded.encode(text, allow_special=True) == tok_with_eot.encode(text, allow_special=True)
+    assert loaded.encode(text, allow_special=True) == tok_with_eot.encode(
+        text, allow_special=True
+    )
+
+
+def test_vocab_size_is_exact_when_limit_is_reached():
+    # vocab_size=260 leaves room for 3 merges + 1 special; this corpus has far more
+    # possible merges, so the loop limit is actually hit (unlike the tests above)
+    tok = BPETokenizer.train(CORPUS, vocab_size=260, special_tokens=[EOT])
+    assert len(tok.vocab) == 260
+    assert tok.special_tokens[EOT] == 259
