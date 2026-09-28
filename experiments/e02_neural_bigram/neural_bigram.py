@@ -99,6 +99,13 @@ def main() -> None:
             f"  {itos[i]!r:12}{count_probs[t, i].item():8.3f}{neural_probs[t, i].item():8.3f}"
         )
 
+    print("\nlearning-rate sweep (3000 steps each)")
+    for lr in (0.5, 5.0, 50.0, 500.0):
+        W_lr = train(train_ids, vocab_size, lr=lr, log_every=0)
+        print(
+            f"  lr={lr:<6} train {eval_loss(W_lr, train_ids):.4f}   val {eval_loss(W_lr, val_ids):.4f}"
+        )
+
 
 if __name__ == "__main__":
     main()
