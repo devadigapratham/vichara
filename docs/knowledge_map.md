@@ -13,12 +13,12 @@ FOUNDATIONS
 LANGUAGE MODELS
 ├── [x] Tokenization (bytes, Unicode, BPE, special tokens)
 ├── [ ] Embeddings
-├── [ ] Attention (causal, multi-head)
+├── [x] Attention (causal, multi-head, GQA/MQA)
 ├── [ ] Transformer block (RMSNorm, RoPE, SwiGLU, residuals)
 ├── [ ] Pretraining
 └── [ ] Generation (sampling, KV cache)
 
-MODERN ARCHITECTURES   [ ] GQA/MQA  [ ] MoE  [ ] RoPE scaling  [ ] Long context  [ ] Efficient attention
+MODERN ARCHITECTURES   [x] GQA/MQA  [ ] MoE  [ ] RoPE scaling  [ ] Long context  [ ] Efficient attention
 REASONING              [ ] Scratchpads/CoT  [ ] SFT  [ ] Verifiers  [ ] GRPO  [ ] Test-time compute
 SAFETY                 [ ] Data safety  [ ] Safety training  [ ] Red teaming  [ ] Evaluation
 SECURITY               [ ] Poisoning/backdoors  [ ] Privacy/extraction  [ ] Prompt injection  [ ] Defenses
