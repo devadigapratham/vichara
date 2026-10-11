@@ -1,5 +1,6 @@
 import json
 from collections import Counter
+from itertools import pairwise
 from pathlib import Path
 
 import regex as re
@@ -15,7 +16,7 @@ def get_pair_counts(chunks: dict[tuple[int, ...], int]) -> Counter:
     # Count the adjacent pairs across all the chunks, weighted by how often each chunk occurs.
     counts = Counter()
     for chunk, freq in chunks.items():
-        for pair in zip(chunk, chunk[1:]):
+        for pair in pairwise(chunk):
             counts[pair] += freq
     return counts
 
@@ -83,9 +84,7 @@ class BPETokenizer:
     def _encode_chunk(self, ids: list[int]) -> list[int]:
         while len(ids) >= 2:
             # the pair that was learned the earliest must be merged first, so we sort by the new_id
-            pair = min(
-                zip(ids, ids[1:]), key=lambda p: self.merges.get(p, float("inf"))
-            )
+            pair = min(pairwise(ids), key=lambda p: self.merges.get(p, float("inf")))
             if pair not in self.merges:
                 break
             ids = merge(ids, pair, self.merges[pair])

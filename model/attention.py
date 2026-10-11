@@ -2,7 +2,7 @@
 import math
 
 import torch
-from torch import nn
+import torch.nn as nn
 
 
 def causal_attention(
@@ -33,7 +33,7 @@ class MultiHeadAttention(nn.Module):
         self.o_proj = nn.Linear(n_heads * self.head_dim, d_model, bias=False)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        B, T, C = x.shape
+        B, T, _ = x.shape
         q = (
             self.q_proj(x).view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
         )  # [B, H, T, hd]
