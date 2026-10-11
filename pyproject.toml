@@ -8,6 +8,11 @@ dependencies = ["torch>=2.4", "numpy", "regex"]
 [project.optional-dependencies]
 dev = ["pytest"]
 
+[tool.ruff.lint]
+# PLR0402 rewrites `import torch.nn as nn` -> `from torch import nn` on save (via fixAll).
+# We prefer the conventional PyTorch alias style, so keep it off.
+ignore = ["PLR0402"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]

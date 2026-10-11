@@ -5,7 +5,12 @@ import math
 import pytest
 import torch
 
-from experiments.e01_bigram.bigram import avg_nll, bigram_probs, build_vocab, count_bigrams
+from experiments.e01_bigram.bigram import (
+    avg_nll,
+    bigram_probs,
+    build_vocab,
+    count_bigrams,
+)
 
 CORPUS = ".ab.abb.b."
 
