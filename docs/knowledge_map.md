@@ -14,7 +14,7 @@ LANGUAGE MODELS
 ├── [x] Tokenization (bytes, Unicode, BPE, special tokens)
 ├── [ ] Embeddings
 ├── [x] Attention (causal, multi-head, GQA/MQA)
-├── [ ] Transformer block (RMSNorm, RoPE, SwiGLU, residuals)
+├── [~] Transformer block (RMSNorm ✓ — next: RoPE, SwiGLU, residuals)
 ├── [ ] Pretraining
 └── [ ] Generation (sampling, KV cache)
 

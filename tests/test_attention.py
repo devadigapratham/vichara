@@ -67,11 +67,11 @@ def test_gqa_shrinks_kv_projections():
     assert gqa.k_proj.weight.shape == (8, 32)  # one shared K head of size 8
 
 
-def test_attention_ignores_order_of_the_past():
-    # Lesson 4 Q2: without positional information, shuffling earlier tokens
-    # does not change the last position's output. (Lesson 5 adds RoPE and flips this.)
+def test_rope_makes_attention_order_aware():
+    # Lesson 4 Q2 showed attention alone ignores the order of the past.
+    # Lesson 5 adds RoPE, so shuffling earlier tokens must now change the last output.
     torch.manual_seed(0)
     attn = MultiHeadAttention(d_model=16, n_heads=2)
     x = torch.randn(1, 5, 16)
     shuffled = x[:, [2, 0, 3, 1, 4]]  # shuffle positions 0-3, keep the last in place
-    assert torch.allclose(attn(x)[:, -1], attn(shuffled)[:, -1], atol=1e-6)
+    assert not torch.allclose(attn(x)[:, -1], attn(shuffled)[:, -1], atol=1e-4)

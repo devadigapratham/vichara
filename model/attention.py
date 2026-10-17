@@ -4,6 +4,8 @@ import math
 import torch
 import torch.nn as nn
 
+from model.positional import apply_rope, rope_cache
+
 
 def causal_attention(
     q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
@@ -19,7 +21,14 @@ def causal_attention(
 
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_model: int, n_heads: int, n_kv_heads: int | None = None):
+    def __init__(
+        self,
+        d_model: int,
+        n_heads: int,
+        n_kv_heads: int | None = None,
+        max_seq_len: int = 1024,
+        rope_base: float = 10000.0,
+    ):
         super().__init__()
         n_kv_heads = n_kv_heads or n_heads
         assert d_model % n_heads == 0, "d_model must be divisible by n_heads"
@@ -27,6 +36,9 @@ class MultiHeadAttention(nn.Module):
         self.n_heads = n_heads
         self.n_kv_heads = n_kv_heads
         self.head_dim = d_model // n_heads
+        cos, sin = rope_cache(max_seq_len, self.head_dim, rope_base)
+        self.register_buffer("rope_cos", cos, persistent=False)
+        self.register_buffer("rope_sin", sin, persistent=False)
         self.q_proj = nn.Linear(d_model, n_heads * self.head_dim, bias=False)
         self.k_proj = nn.Linear(d_model, n_kv_heads * self.head_dim, bias=False)
         self.v_proj = nn.Linear(d_model, n_kv_heads * self.head_dim, bias=False)
@@ -43,6 +55,8 @@ class MultiHeadAttention(nn.Module):
         v = (
             self.v_proj(x).view(B, T, self.n_kv_heads, self.head_dim).transpose(1, 2)
         )  # [B, KV, T, hd]
+        q = apply_rope(q, self.rope_cos[:T], self.rope_sin[:T])
+        k = apply_rope(k, self.rope_cos[:T], self.rope_sin[:T])
 
         group = self.n_heads // self.n_kv_heads
         k = k.repeat_interleave(group, dim=1)  # [B, H, T, hd]
