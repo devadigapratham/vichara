@@ -8,14 +8,14 @@ FOUNDATIONS
 ├── [x] Maximum likelihood, negative log-likelihood, cross-entropy
 ├── [x] Perplexity
 ├── [x] Gradients, chain rule, autograd, gradient checking
-└── [~] Optimization (SGD, minibatches, learning rate — next: Adam, AdamW, schedules)
+└── [x] Optimization (SGD, AdamW, warmup + cosine, clipping, accumulation)
 
 LANGUAGE MODELS
 ├── [x] Tokenization (bytes, Unicode, BPE, special tokens)
-├── [ ] Embeddings
+├── [x] Embeddings (nn.Embedding = lookup table, tied with lm_head)
 ├── [x] Attention (causal, multi-head, GQA/MQA)
-├── [~] Transformer block (RMSNorm ✓, RoPE ✓, residuals ✓ — next: SwiGLU, full GPT)
-├── [ ] Pretraining
+├── [x] Transformer block (RMSNorm, RoPE, residuals, pre-norm, SwiGLU, init, weight tying)
+├── [~] Pretraining (loop, checkpoints, FLOPs, overfitting ✓ — next: TinyStories at scale)
 └── [ ] Generation (sampling, KV cache)
 
 MODERN ARCHITECTURES   [x] GQA/MQA  [ ] MoE  [ ] RoPE scaling  [ ] Long context  [ ] Efficient attention
