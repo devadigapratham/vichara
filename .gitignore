@@ -8,3 +8,4 @@ wandb/
 runs/
 .vscode/
 docs/lessons/
+data/tokens/

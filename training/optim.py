@@ -16,7 +16,7 @@ class AdamW(torch.optim.Optimizer):
         weight_decay: float = 0.1,
     ):
         super().__init__(
-            params, dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)
+            params, {"lr": lr, "betas": betas, "eps": eps, "weight_decay": weight_decay}
         )
 
     @torch.no_grad()
