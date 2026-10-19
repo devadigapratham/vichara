@@ -6,9 +6,11 @@ from pathlib import Path
 
 import torch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # must run BEFORE the imports below
-from model.transformer import GPT, GPTConfig  # noqa: E402
-from training.data import load_meta  # noqa: E402
+sys.path.insert(
+    0, str(Path(__file__).resolve().parents[1])
+)  # must run BEFORE the imports below
+from model.transformer import GPT, GPTConfig
+from training.data import load_meta
 
 
 def filter_logits(
@@ -26,7 +28,9 @@ def filter_logits(
     if top_p is not None:
         sorted_logits, order = torch.sort(logits, descending=True)
         probs = sorted_logits.softmax(dim=-1)
-        mass_before = probs.cumsum(-1) - probs  # mass of the tokens ranked ABOVE this one
+        mass_before = (
+            probs.cumsum(-1) - probs
+        )  # mass of the tokens ranked ABOVE this one
         sorted_logits = sorted_logits.masked_fill(mass_before > top_p, float("-inf"))
         logits = torch.full_like(logits, float("-inf")).scatter_(
             -1, order, sorted_logits
