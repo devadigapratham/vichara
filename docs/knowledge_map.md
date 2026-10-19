@@ -19,10 +19,10 @@ LANGUAGE MODELS
 └── [x] Generation (temperature, top-k, top-p, KV cache, prefill vs decode)
 
 MODERN ARCHITECTURES   [x] GQA/MQA  [ ] MoE  [ ] RoPE scaling  [ ] Long context  [ ] Efficient attention
-REASONING              [ ] Scratchpads/CoT  [ ] SFT  [ ] Verifiers  [ ] GRPO  [ ] Test-time compute
+REASONING              [x] Scratchpads/CoT (Exp. 4)  [ ] SFT  [ ] Verifiers  [ ] GRPO  [ ] Test-time compute
 SAFETY                 [ ] Data safety  [ ] Safety training  [ ] Red teaming  [ ] Evaluation
-SECURITY               [ ] Poisoning/backdoors  [ ] Privacy/extraction  [ ] Prompt injection  [ ] Defenses
-INTERPRETABILITY       [ ] Ablation  [ ] Probing  [ ] Patching  [ ] SAEs
+SECURITY               [ ] Poisoning/backdoors  [~] Privacy/extraction (memorization, Exp. 3)  [ ] Prompt injection  [ ] Defenses
+INTERPRETABILITY       [x] Ablation + attention patterns (Exp. 5)  [ ] Probing  [ ] Patching  [ ] SAEs
 ML SYSTEMS             [ ] Hardware math  [ ] Profiling  [ ] Mixed precision  [ ] Distributed  [ ] Kernels
 PRODUCTION             [ ] Inference engine  [ ] Quantization  [ ] Serving  [ ] MLOps  [ ] Observability
 ```

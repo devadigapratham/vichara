@@ -58,6 +58,10 @@ class MultiHeadAttention(nn.Module):
         self.k_proj = nn.Linear(d_model, n_kv_heads * self.head_dim, bias=False)
         self.v_proj = nn.Linear(d_model, n_kv_heads * self.head_dim, bias=False)
         self.o_proj = nn.Linear(n_heads * self.head_dim, d_model, bias=False)
+        # interpretability hooks (plain attributes: not parameters, not saved in checkpoints)
+        self.head_mask: torch.Tensor | None = None  # [n_heads]; 0 switches a head off
+        self.record_attention = False
+        self.last_attention: torch.Tensor | None = None
 
     def forward(self, x: torch.Tensor, cache: KVCache | None = None) -> torch.Tensor:
         B, T, _ = x.shape
@@ -80,7 +84,11 @@ class MultiHeadAttention(nn.Module):
         k = k.repeat_interleave(group, dim=1)  # [B, H, T, hd]
         v = v.repeat_interleave(group, dim=1)
 
-        y, _ = causal_attention(q, k, v)  # [B, H, T, hd]
+        y, weights = causal_attention(q, k, v)  # [B, H, T, hd], [B, H, T, T]
+        if self.record_attention:
+            self.last_attention = weights.detach()
+        if self.head_mask is not None:
+            y = y * self.head_mask.view(1, -1, 1, 1).to(y.dtype)
         y = (
             y.transpose(1, 2).contiguous().view(B, T, self.n_heads * self.head_dim)
         )  # [B, T, C]
