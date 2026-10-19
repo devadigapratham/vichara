@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from model.attention import MultiHeadAttention
+from model.attention import KVCache, MultiHeadAttention
 from model.mlp import SwiGLU
 from model.norm import RMSNorm
 
@@ -33,8 +33,8 @@ class Block(nn.Module):
         self.mlp_norm = RMSNorm(cfg.d_model)
         self.mlp = SwiGLU(cfg.d_model, cfg.mlp_hidden)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = x + self.attn(self.attn_norm(x))  # gather information from other positions
+    def forward(self, x: torch.Tensor, cache: KVCache | None = None) -> torch.Tensor:
+        x = x + self.attn(self.attn_norm(x), cache)  # gather information from other positions
         x = x + self.mlp(self.mlp_norm(x))  # process it, per position
         return x
 
@@ -63,11 +63,11 @@ class GPT(nn.Module):
             nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
     def forward(
-        self, ids: torch.Tensor, targets: torch.Tensor | None = None
+        self, ids: torch.Tensor, targets: torch.Tensor | None = None, caches: list[KVCache] | None = None
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
         x = self.tok_emb(ids)  # [B, T] → [B, T, C]
-        for block in self.blocks:
-            x = block(x)
+        for i, block in enumerate(self.blocks):
+            x = block(x, None if caches is None else caches[i])
         logits = self.lm_head(self.norm(x))  # [B, T, V]
 
         loss = None
@@ -79,3 +79,8 @@ class GPT(nn.Module):
 
     def num_params(self) -> int:
         return sum(p.numel() for p in self.parameters())
+
+    def new_caches(self, batch_size: int, device) -> list[KVCache]:
+        head_dim = self.cfg.d_model // self.cfg.n_heads
+        return [KVCache(batch_size, self.cfg.n_kv_heads, self.cfg.max_seq_len, head_dim, device)
+                for _ in self.blocks]

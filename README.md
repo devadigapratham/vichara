@@ -16,10 +16,11 @@ The goal is to understand every layer of the stack, not just to train a model: t
 | ✅ | Causal multi-head attention | `model/attention.py` | MHA / GQA / MQA; output matches `F.scaled_dot_product_attention` |
 | ✅ | RMSNorm | `model/norm.py` | computed in fp32 for bf16 safety; matches `nn.RMSNorm` |
 | ✅ | RoPE | `model/positional.py` | scores depend only on relative position (tested) |
-| ⏳ | SwiGLU MLP + full GPT model | `model/` | next |
-| ⬜ | Training loop (AdamW, warmup + cosine, checkpoints) | `training/` | |
-| ⬜ | Pretraining on TinyStories | | ~10–20M params, on an Apple M4 Pro |
-| ⬜ | Generation + KV cache | `inference/` | |
+| ✅ | SwiGLU MLP + full GPT model | `model/transformer.py` | 14.16M params; tied embeddings; parameter count derived by hand |
+| ✅ | AdamW + warmup/cosine schedule | `training/optim.py` | AdamW written from scratch; matches `torch.optim.AdamW` |
+| ✅ | Training loop | `training/pretrain.py` | clipping, accumulation, resumable atomic checkpoints (crash and resume give a bit-identical result) |
+| ✅ | Pretraining on TinyStories | `checkpoints/` (not in git) | val loss **1.42** after 74M tokens (~1 h on an M4 Pro); writes coherent short stories |
+| ✅ | Generation + KV cache | `inference/generate.py` | temperature / top-k / top-p; KV cache 7× faster on CPU with identical outputs |
 | ⬜ | Reasoning, safety, interpretability, serving | | see [ROADMAP.md](ROADMAP.md) |
 
 ## Results so far
@@ -37,6 +38,18 @@ The goal is to understand every layer of the stack, not just to train a model: t
 - **3.98 bytes/token** on held-out text, comparable to GPT-2's 50k vocabulary on English, with 12× fewer entries;
 - 435 of 4096 entries are never used on the validation text;
 - it falls back to bytes for rare inputs (digits, emoji), so no input is ever unencodable.
+
+**Transformer on Shakespeare** (9.5M params, same data and split as above): best val **1.54** at step 500. It then overfits: by step 1750 val reaches 3.27 while train falls to 0.14, and the overfit checkpoint reproduces **23.5%** of its output verbatim from the training set (control: 0%). See `experiments/e03_memorization/`.
+
+**TinyStories** (14.16M params, 4096-token BPE, 556.6M training tokens, 74M used):
+
+| step | 0 | 500 | 1000 | 2000 | 3000 | 4000 |
+|---|---|---|---|---|---|---|
+| train | 8.40 | 2.21 | 1.89 | 1.65 | 1.53 | 1.45 |
+| val | 8.40 | 2.17 | 1.85 | 1.62 | 1.50 | 1.42 |
+
+Sample (prompt: *"Once upon a time, a little dragon"*):
+> Once upon a time, a little dragon lived in a big forest. He had a very big, strong roar. All the other animals liked to listen to him. He liked to listen to them.
 
 ## Layout
 

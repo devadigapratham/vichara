@@ -10,6 +10,7 @@ sys.path.insert(
     0, str(Path(__file__).resolve().parents[1])
 )  # must run BEFORE the imports below
 from model.transformer import GPT, GPTConfig
+from tokenizer.bpe import BPETokenizer
 from training.data import load_meta
 
 
@@ -53,23 +54,28 @@ def sample_next(
 
 
 @torch.no_grad()
-def generate(
-    model: GPT,
-    ids: torch.Tensor,
-    max_new_tokens: int,
-    temperature: float = 1.0,
-    top_k: int | None = None,
-    top_p: float | None = None,
-    generator: torch.Generator | None = None,
-) -> torch.Tensor:
+def generate(model, ids, max_new_tokens, temperature=1.0, top_k=None, top_p=None, generator=None, use_cache=True):
     model.eval()
-    for _ in range(max_new_tokens):
-        context = ids[:, -model.cfg.max_seq_len :]  # crop to the context window
-        logits, _ = model(context)  # [B, T, V]
-        next_id = sample_next(
-            logits[:, -1, :], temperature, top_k, top_p, generator
-        )  # only the LAST position
+    max_len = model.cfg.max_seq_len
+    if not use_cache:
+        for _ in range(max_new_tokens):
+            logits, _ = model(ids[:, -max_len:])
+            next_id = sample_next(logits[:, -1, :], temperature, top_k, top_p, generator)
+            ids = torch.cat([ids, next_id], dim=1)
+        return ids
+
+    caches = model.new_caches(ids.size(0), ids.device)
+    logits, _ = model(ids[:, -max_len:], caches=caches)
+    for i in range(max_new_tokens):
+        next_id = sample_next(logits[:, -1, :], temperature, top_k, top_p, generator)
         ids = torch.cat([ids, next_id], dim=1)
+        if i == max_new_tokens - 1:
+            break
+        if caches[0].length == max_len:
+            caches = model.new_caches(ids.size(0), ids.device)
+            logits, _ = model(ids[:, -(max_len // 2):], caches=caches)
+        else:
+            logits, _ = model(next_id, caches=caches)
     return ids
 
 
@@ -85,10 +91,23 @@ def load_model(path: str, device: str = "cpu") -> tuple[GPT, dict]:
     return model, ckpt
 
 
+REPO = Path(__file__).resolve().parents[1]
+
+
+def get_codec(meta: dict):
+    """Return (encode, decode) for a dataset: character-level, or our BPE tokenizer."""
+    if "itos" in meta:
+        itos = meta["itos"]
+        stoi = {ch: i for i, ch in enumerate(itos)}
+        return (lambda s: [stoi[ch] for ch in s]), (lambda ids: "".join(itos[i] for i in ids))
+    tok = BPETokenizer.load(REPO / meta["tokenizer"])
+    return tok.encode_ordinary, tok.decode
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--ckpt", default="checkpoints/shakespeare_char/best.pt")
-    p.add_argument("--prompt", default="\n")
+    p.add_argument("--prompt", default=None)
     p.add_argument("--max-new-tokens", type=int, default=500)
     p.add_argument("--temperature", type=float, default=0.8)
     p.add_argument("--top-k", type=int, default=None)
@@ -97,14 +116,18 @@ def main() -> None:
     args = p.parse_args()
 
     model, ckpt = load_model(args.ckpt)
-    itos = load_meta(ckpt["train_config"]["dataset"])["itos"]
-    stoi = {ch: i for i, ch in enumerate(itos)}
-    ids = torch.tensor([[stoi[ch] for ch in args.prompt]])
+    meta = load_meta(ckpt["train_config"]["dataset"])
+    encode, decode = get_codec(meta)
+    if args.prompt is None:                          # no prompt: start like a fresh document
+        start = [meta["eot_id"]] if "eot_id" in meta else encode("\n")
+    else:
+        start = encode(args.prompt)
+    ids = torch.tensor([start])
     g = torch.Generator().manual_seed(args.seed)
     out = generate(
         model, ids, args.max_new_tokens, args.temperature, args.top_k, args.top_p, g
     )
-    print("".join(itos[i] for i in out[0].tolist()))
+    print(decode(out[0].tolist()))
 
 
 if __name__ == "__main__":

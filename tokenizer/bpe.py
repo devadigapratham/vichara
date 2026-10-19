@@ -52,6 +52,7 @@ class BPETokenizer:
 
         for token, i in self.special_tokens.items():
             self.vocab[i] = token.encode("utf-8")
+        self._cache: dict[str, list[int]] = {}
 
     def pretokenize(self, text: str) -> list[str]:
         return self.compiled.findall(text)
@@ -93,7 +94,12 @@ class BPETokenizer:
     def encode_ordinary(self, text: str) -> list[int]:
         ids = []
         for chunk in self.pretokenize(text):
-            ids.extend(self._encode_chunk(list(chunk.encode("utf-8"))))
+            cached = self._cache.get(chunk)
+            if cached is None:
+                cached = self._encode_chunk(list(chunk.encode("utf-8")))
+                if len(self._cache) < 1_000_000:
+                    self._cache[chunk] = cached
+            ids.extend(cached)
         return ids
 
     def encode(self, text: str, allow_special: bool = False) -> list[int]:

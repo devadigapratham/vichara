@@ -10,14 +10,29 @@ from model.positional import apply_rope, rope_cache
 def causal_attention(
     q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    # we take q, k, v: [B, H, T, d] and return output [B, H, T, d] and weights [B, H, T, T]
+    # q: [B, H, Tq, d]; k, v: [B, H, Tk, d] with Tk >= Tq (the queries are the LAST Tq positions)
     d = q.size(-1)
-    T = q.size(-2)
+    Tq, Tk = q.size(-2), k.size(-2)
     scores = q @ k.transpose(-2, -1) / math.sqrt(d)
-    future = torch.triu(torch.ones(T, T, dtype=torch.bool, device=q.device), diagonal=1)
+    future = torch.triu(torch.ones(Tq, Tk, dtype=torch.bool, device=q.device), diagonal=Tk - Tq + 1)
     scores = scores.masked_fill(future, float("-inf"))
     weights = scores.softmax(dim=-1)
     return weights @ v, weights
+
+
+class KVCache:
+    def __init__(self, batch_size, n_kv_heads, max_len, head_dim, device, dtype=torch.float32):
+        shape = (batch_size, n_kv_heads, max_len, head_dim)
+        self.k = torch.zeros(shape, device=device, dtype=dtype)
+        self.v = torch.zeros(shape, device=device, dtype=dtype)
+        self.length = 0
+
+    def update(self, k_new, v_new):
+        start, end = self.length, self.length + k_new.size(2)
+        self.k[:, :, start:end] = k_new
+        self.v[:, :, start:end] = v_new
+        self.length = end
+        return self.k[:, :, :end], self.v[:, :, :end]
 
 
 class MultiHeadAttention(nn.Module):
@@ -44,7 +59,7 @@ class MultiHeadAttention(nn.Module):
         self.v_proj = nn.Linear(d_model, n_kv_heads * self.head_dim, bias=False)
         self.o_proj = nn.Linear(n_heads * self.head_dim, d_model, bias=False)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, cache: KVCache | None = None) -> torch.Tensor:
         B, T, _ = x.shape
         q = (
             self.q_proj(x).view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
@@ -55,8 +70,11 @@ class MultiHeadAttention(nn.Module):
         v = (
             self.v_proj(x).view(B, T, self.n_kv_heads, self.head_dim).transpose(1, 2)
         )  # [B, KV, T, hd]
-        q = apply_rope(q, self.rope_cos[:T], self.rope_sin[:T])
-        k = apply_rope(k, self.rope_cos[:T], self.rope_sin[:T])
+        start = cache.length if cache is not None else 0
+        q = apply_rope(q, self.rope_cos[start : start + T], self.rope_sin[start : start + T])
+        k = apply_rope(k, self.rope_cos[start : start + T], self.rope_sin[start : start + T])
+        if cache is not None:
+            k, v = cache.update(k, v)
 
         group = self.n_heads // self.n_kv_heads
         k = k.repeat_interleave(group, dim=1)  # [B, H, T, hd]

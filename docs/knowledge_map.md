@@ -15,8 +15,8 @@ LANGUAGE MODELS
 ├── [x] Embeddings (nn.Embedding = lookup table, tied with lm_head)
 ├── [x] Attention (causal, multi-head, GQA/MQA)
 ├── [x] Transformer block (RMSNorm, RoPE, residuals, pre-norm, SwiGLU, init, weight tying)
-├── [~] Pretraining (loop, checkpoints, FLOPs, overfitting ✓ — next: TinyStories at scale)
-└── [ ] Generation (sampling, KV cache)
+├── [x] Pretraining (loop, checkpoints, FLOPs, overfitting vs. single-epoch, TinyStories run)
+└── [x] Generation (temperature, top-k, top-p, KV cache, prefill vs decode)
 
 MODERN ARCHITECTURES   [x] GQA/MQA  [ ] MoE  [ ] RoPE scaling  [ ] Long context  [ ] Efficient attention
 REASONING              [ ] Scratchpads/CoT  [ ] SFT  [ ] Verifiers  [ ] GRPO  [ ] Test-time compute
