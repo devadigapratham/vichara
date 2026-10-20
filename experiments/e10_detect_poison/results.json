@@ -1,0 +1,38 @@
+{
+  "0.003": {
+    "16-gram repetition": {
+      "auroc": 0.9384191840505763,
+      "tpr_at_1pct_fpr": 0.0
+    },
+    "24-gram repetition": {
+      "auroc": 1.0,
+      "tpr_at_1pct_fpr": 1.0
+    },
+    "low-loss window": {
+      "auroc": 0.9170782622295093,
+      "tpr_at_1pct_fpr": 0.03389830508474576
+    },
+    "vs reference model": {
+      "auroc": 1.0,
+      "tpr_at_1pct_fpr": 1.0
+    }
+  },
+  "0.01": {
+    "16-gram repetition": {
+      "auroc": 0.9726663415082776,
+      "tpr_at_1pct_fpr": 0.0
+    },
+    "24-gram repetition": {
+      "auroc": 0.9948725989729117,
+      "tpr_at_1pct_fpr": 0.9900497512437811
+    },
+    "low-loss window": {
+      "auroc": 0.9940654824770033,
+      "tpr_at_1pct_fpr": 0.9601990049751243
+    },
+    "vs reference model": {
+      "auroc": 0.998167905861872,
+      "tpr_at_1pct_fpr": 0.9950248756218906
+    }
+  }
+}

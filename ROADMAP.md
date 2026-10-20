@@ -61,7 +61,85 @@ Rule: anything that needs more than about $30 of GPU time is simulated at small 
 
 - Done when: greedy, temperature, top-k and top-p sampling work; the KV cache gives identical outputs to no-cache generation (tested) and the speedup is measured.
 
-### Level 2 — Research model (Kaggle / Modal)
+### Level 2 — Headline projects ("best within our budget", decided 2026-10-19)
+
+Each project makes a **narrow, verifiable claim** against published numbers under the published protocol. Numbers below come from literature surveys and must be re-verified against the papers before any claim.
+
+**Phase 0 · Shared infrastructure** (needed by all three): GPU path on Kaggle (free T4) and Modal; bf16/fp16 autocast, SDPA/FlashAttention, torch.compile, each speedup measured; a shared evaluation harness and experiment tracking.
+
+**Project 1 · BabyLM Strict-Small: a model trained entirely from scratch**
+- Rules: ≤ 10M words of training data, ≤ 10 epochs, no compute cap; data swaps allowed in the 2026 edition.
+- Bar (2025 results): GPT-2 baseline 49.1 · GPT-BERT-causal ≈ 56.4 · winner 58.3 (masked model).
+- Plan: a ~30M causal decoder (ours), then ablate speedrun techniques (Muon, QK-norm, ReLU², value embeddings, softcap). Secondary score: FineWeb bits-per-byte against pythia-14m/31m.
+- Compute: ~8–12 h on the Mac, or < 1 h on a Kaggle T4.
+
+**Project 2 · Small reasoning model: our GRPO on an open base model**
+- Load Qwen2.5-0.5B **into our own model code** (a weight-loading exercise), then run our GRPO on GSM8K/MATH.
+- Bar: Qwen2.5-0.5B base GSM8K 36.7 → 49.5 (SimpleRL-Zoo); 56.7 from Instruct (verl). Stretch: 1.5B GSM8K 74–78, MATH-500 ≥ 55–59.
+- Controls: format-only reward, one prompt, greedy decoding, the same answer extractor before and after; watch for Qwen contamination effects.
+- Compute: ~$30–45 of Modal L4/A10G time; save credits until Phase 0 is done.
+
+**Project 3 · Interpretability and safety findings** (on the models from Projects 1–2)
+- Reward-hacking detection during GRPO: a probe vs a head-ablation signature vs output checks (AUC, earliest detection, false positives). Extends Experiment 7.
+- Backdoor + "defection probes" on our own model: do generic linear probes catch a planted trigger at small scale? Does ablation remove it?
+- One directly comparable number: a Matryoshka BatchTopK SAE on Pythia-160M layer 8 → SAEBench.
+
+**Safety and interpretability are equal tracks, interleaved from the start** (most of it runs on the Mac with existing models):
+
+| Interpretability | Safety & security |
+|---|---|
+| I1 activation patching (the L7H1 mystery, Experiment 5) | S1 backdoor via data poisoning on TinyStories (attack success vs poison rate) |
+| I2 linear probes (character tracking, "will this answer be correct?") | S2 backdoor detection: defection probes + head ablation (detection rate, false positives) |
+| I3 SAE on TinyStories → SAEBench on Pythia-160M | S3 membership inference on the BabyLM model (clean member/non-member split) |
+| I4 what did GRPO change inside the model? | S4 live reward-hacking monitors during Project 2's RL |
+| | S5 instruction tuning → refusals → jailbreak robustness |
+
+**Order:** S1 → Phase 0 → I1 + I2 → S2 → Project 1 → S3 → I3 → Project 2 + S4 → I4 → S5.
+
+**The full original plan continues alongside the headline projects (nothing is dropped). Coverage and the "best-in-class" angle per area:**
+
+| Area | Done | To do | Best-in-class angle |
+|---|---|---|---|
+| Architecture | BPE, RoPE, GQA/MQA, RMSNorm, SwiGLU | sliding window, MoE, RoPE scaling, long context | MoE vs dense at equal active params inside BabyLM; YaRN + passkey retrieval |
+| Training systems | AdamW, schedules, clipping, accumulation, checkpoints | mixed precision, FlashAttention, torch.compile, profiling, DDP/FSDP, TP/PP, Triton | DDP scaling on Kaggle 2×T4; MFU of our kernels |
+| Data pipeline | — | collection, provenance, cleaning, quality filtering, dedup, PII/safety filtering | data curation for BabyLM's 10M words (Project 1) |
+| Reasoning | scratchpad/CoT, GRPO, reward hacking | self-consistency, best-of-N, search, ORM/PRM, rejection-sampling SFT, PPO, DPO, distillation, test-time scaling | accuracy-vs-compute curves on GSM8K vs published |
+| Safety | reward hacking | safety SFT, preference training, red teaming, classifiers, constitutional, refusals, jailbreaks, I/O filters | XSTest over-refusal + HarmBench subset on our instruction-tuned Qwen |
+| Security | memorization | backdoors, MIA, extraction, prompt injection, malicious fine-tuning, supply chain, RAG/agent, sandboxing | TPR@low-FPR for MIA and backdoor detection; injection on a toy agent |
+| Interpretability | attention patterns, ablation | probes, patching, causal tracing, attribution, SAEs, circuits | SAEBench on Pythia-160M |
+| Inference | sampling, KV cache | continuous batching, paged KV, speculative decoding, beam search | our engine's throughput vs vLLM on the same GPU/model |
+| Quantization | — | INT8/INT4, GPTQ, AWQ, SmoothQuant, QAT | our GPTQ matching published 4-bit perplexity deltas |
+| Serving / MLOps / observability / deployment | — | FastAPI streaming, auth, rate limits, Docker, CI eval gates, registry, canary/rollback, monitoring, autoscaling | a deployed endpoint with eval-gated releases |
+
+**Learning track (not headline):** length generalization (harness done, Experiment 8 baseline: 100% at 1–10 digits, 0% from 11), position coupling / Abacus as an exercise.
+
+### Level 2 — Research program (earlier plan, kept for reference)
+
+The three tracks are interleaved on purpose: the interpretability tools explain the reasoning results, and the safety experiments use both.
+
+**Track A · Reasoning: length generalization in addition (the "SOTA within our budget" target)**
+- A1 Literature survey + baseline harness: train on short numbers, test far longer; many seeds; published protocol.
+- A2 Reproduce the failure at scale (e.g. train ≤ 10 digits, test 11–50).
+- A3 Implement published methods on equal footing: index hints, randomized positions, Abacus-style digit-position embeddings, position coupling.
+- A4 Try to improve on them; ablate what matters.
+- Done when: a results table with ≥ 3 seeds per method, compared against published numbers using the same protocol.
+
+**Track B · Mechanistic interpretability**
+- B1 Probes: does the adder's residual stream linearly encode the carry? At which layer? Does that break at unseen lengths (explaining A2)?
+- B2 Activation patching: solve the L7H1 mystery from Experiment 5 (does it read what L5H4 wrote?).
+- B3 A small sparse autoencoder on the TinyStories residual stream: find interpretable features.
+- Done when: each claim is backed by an intervention, not just a correlation, with controls.
+
+**Track C · AI safety and security**
+- ✅ C0 Reward hacking (Experiment 7): buggy verifier → proxy ↑, truth → 0; KL as a safeguard.
+- C1 Backdoor via data poisoning on TinyStories: a trigger phrase → a planted behaviour; measure attack success vs. poison rate; then try to detect it (with Track B tools).
+- C2 Membership inference / training-data extraction, extending Experiment 3: can an attacker tell which text was in training?
+- C3 SFT for instruction-following, then refusal behaviour and jailbreak robustness on our own model.
+- Done when: each attack has a measured success rate, and each defence has measured false positives and false negatives.
+
+Already done in Level 2: ✅ GRPO from scratch (Experiment 6: RL sharpens pass@1, pass@8 unchanged; SFT control), ✅ reward hacking (Experiment 7).
+
+### Level 2 — Milestone reference (Kaggle / Modal)
 
 **M8 · Evaluation harness**: val perplexity, a held-out reasoning set, a safety prompt set, all reproducible from a config plus seed.
 **M9 · Hardware literacy**: profile a training step on a CUDA GPU (PyTorch Profiler); classify ops as compute-, memory- or launch-bound; measure MFU.
