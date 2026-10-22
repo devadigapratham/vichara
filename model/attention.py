@@ -3,6 +3,7 @@ import math
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from model.positional import apply_rope, rope_cache
 
@@ -14,14 +15,18 @@ def causal_attention(
     d = q.size(-1)
     Tq, Tk = q.size(-2), k.size(-2)
     scores = q @ k.transpose(-2, -1) / math.sqrt(d)
-    future = torch.triu(torch.ones(Tq, Tk, dtype=torch.bool, device=q.device), diagonal=Tk - Tq + 1)
+    future = torch.triu(
+        torch.ones(Tq, Tk, dtype=torch.bool, device=q.device), diagonal=Tk - Tq + 1
+    )
     scores = scores.masked_fill(future, float("-inf"))
     weights = scores.softmax(dim=-1)
     return weights @ v, weights
 
 
 class KVCache:
-    def __init__(self, batch_size, n_kv_heads, max_len, head_dim, device, dtype=torch.float32):
+    def __init__(
+        self, batch_size, n_kv_heads, max_len, head_dim, device, dtype=torch.float32
+    ):
         shape = (batch_size, n_kv_heads, max_len, head_dim)
         self.k = torch.zeros(shape, device=device, dtype=dtype)
         self.v = torch.zeros(shape, device=device, dtype=dtype)
@@ -43,6 +48,7 @@ class MultiHeadAttention(nn.Module):
         n_kv_heads: int | None = None,
         max_seq_len: int = 1024,
         rope_base: float = 10000.0,
+        use_sdpa: bool = False,
     ):
         super().__init__()
         n_kv_heads = n_kv_heads or n_heads
@@ -51,6 +57,7 @@ class MultiHeadAttention(nn.Module):
         self.n_heads = n_heads
         self.n_kv_heads = n_kv_heads
         self.head_dim = d_model // n_heads
+        self.use_sdpa = use_sdpa
         cos, sin = rope_cache(max_seq_len, self.head_dim, rope_base)
         self.register_buffer("rope_cos", cos, persistent=False)
         self.register_buffer("rope_sin", sin, persistent=False)
@@ -75,8 +82,12 @@ class MultiHeadAttention(nn.Module):
             self.v_proj(x).view(B, T, self.n_kv_heads, self.head_dim).transpose(1, 2)
         )  # [B, KV, T, hd]
         start = cache.length if cache is not None else 0
-        q = apply_rope(q, self.rope_cos[start : start + T], self.rope_sin[start : start + T])
-        k = apply_rope(k, self.rope_cos[start : start + T], self.rope_sin[start : start + T])
+        q = apply_rope(
+            q, self.rope_cos[start : start + T], self.rope_sin[start : start + T]
+        )
+        k = apply_rope(
+            k, self.rope_cos[start : start + T], self.rope_sin[start : start + T]
+        )
         if cache is not None:
             k, v = cache.update(k, v)
 
@@ -84,12 +95,14 @@ class MultiHeadAttention(nn.Module):
         k = k.repeat_interleave(group, dim=1)  # [B, H, T, hd]
         v = v.repeat_interleave(group, dim=1)
 
-        y, weights = causal_attention(q, k, v)  # [B, H, T, hd], [B, H, T, T]
-        if self.record_attention:
-            self.last_attention = weights.detach()
+        if self.use_sdpa and not self.record_attention and k.size(2) == T:
+            y = F.scaled_dot_product_attention(q, k, v, is_causal=True)
+        else:
+            y, weights = causal_attention(q, k, v)
+            if self.record_attention:
+                self.last_attention = weights.detach()
+
         if self.head_mask is not None:
             y = y * self.head_mask.view(1, -1, 1, 1).to(y.dtype)
-        y = (
-            y.transpose(1, 2).contiguous().view(B, T, self.n_heads * self.head_dim)
-        )  # [B, T, C]
+        y = y.transpose(1, 2).contiguous().view(B, T, self.n_heads * self.head_dim)
         return self.o_proj(y)

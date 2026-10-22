@@ -44,6 +44,10 @@ class TrainConfig:
     log_every: int = 10
     seed: int = 1337
     device: str = "auto"
+    # speed
+    precision: str = "fp32"
+    sdpa: bool = False
+    compile: bool = False
 
 
 def pick_device(name: str) -> torch.device:
@@ -73,6 +77,11 @@ def flops_per_token(cfg: GPTConfig, n_params: int) -> float:
 
 
 @torch.no_grad()
+def autocast(cfg: TrainConfig, device: torch.device):
+    dtype = {"fp32": None, "bf16": torch.bfloat16, "fp16": torch.float16}[cfg.precision]
+    return torch.autocast(device.type, dtype=dtype, enabled=dtype is not None)
+
+
 def evaluate(model: GPT, splits: dict, cfg: TrainConfig, device: torch.device) -> dict:
     model.eval()
     out = {}
@@ -81,7 +90,8 @@ def evaluate(model: GPT, splits: dict, cfg: TrainConfig, device: torch.device) -
         losses = []
         for _ in range(cfg.eval_batches):
             x, y = get_batch(tokens, cfg.batch_size, cfg.seq_len, rng)
-            _, loss = model(x.to(device), y.to(device))
+            with autocast(cfg, device):
+                _, loss = model(x.to(device), y.to(device))
             losses.append(loss.item())
         out[name] = sum(losses) / len(losses)
     model.train()
@@ -117,6 +127,7 @@ def build_model(cfg: TrainConfig, vocab_size: int) -> GPT:
             n_kv_heads=cfg.n_kv_heads,
             mlp_hidden=cfg.mlp_hidden,
             max_seq_len=cfg.seq_len,
+            use_sdpa=cfg.sdpa,
         )
     )
 
@@ -136,6 +147,8 @@ def train(
     torch.manual_seed(cfg.seed)
     model = build_model(cfg, vocab_size).to(device)
     opt = AdamW(param_groups(model, cfg.weight_decay), lr=cfg.max_lr)
+    scaler = torch.amp.GradScaler(device.type, enabled=cfg.precision == "fp16")
+    step_model = torch.compile(model) if cfg.compile else model
     rng = np.random.default_rng(cfg.seed)
     step, best_val = 0, math.inf
 
@@ -188,11 +201,14 @@ def train(
             loss_sum = 0.0
             for _ in range(cfg.grad_accum_steps):
                 x, y = get_batch(splits["train"], cfg.batch_size, cfg.seq_len, rng)
-                _, loss = model(x.to(device), y.to(device))
-                (loss / cfg.grad_accum_steps).backward()
+                with autocast(cfg, device):
+                    _, loss = step_model(x.to(device), y.to(device))
+                scaler.scale(loss / cfg.grad_accum_steps).backward()
                 loss_sum += loss.item()
+            scaler.unscale_(opt)
             grad_norm = clip_grad_norm(model.parameters(), cfg.grad_clip)
-            opt.step()
+            scaler.step(opt)
+            scaler.update()
             opt.zero_grad(set_to_none=True)
             step += 1
 
@@ -229,14 +245,23 @@ def train(
     return {"step": step, "model": model, **metrics}
 
 
-def main() -> None:
+def parse_args(argv: list[str] | None = None) -> tuple[TrainConfig, bool]:
     parser = argparse.ArgumentParser()
-    for f in fields(TrainConfig):  # one --flag per config field, automatically
-        parser.add_argument(f"--{f.name.replace('_', '-')}", type=type(f.default), default=f.default)
+    for f in fields(TrainConfig):
+        name = f"--{f.name.replace('_', '-')}"
+        if isinstance(f.default, bool):
+            parser.add_argument(name, action=argparse.BooleanOptionalAction, default=f.default)
+        else:
+            parser.add_argument(name, type=type(f.default), default=f.default)
     parser.add_argument("--resume", action="store_true")
-    args = vars(parser.parse_args())
+    args = vars(parser.parse_args(argv))
     resume = args.pop("resume")
-    train(TrainConfig(**args), resume=resume)
+    return TrainConfig(**args), resume
+
+
+def main() -> None:
+    cfg, resume = parse_args()
+    train(cfg, resume=resume)
 
 
 if __name__ == "__main__":

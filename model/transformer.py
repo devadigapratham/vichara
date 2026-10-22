@@ -21,6 +21,7 @@ class GPTConfig:
     mlp_hidden: int = 1024
     max_seq_len: int = 512
     rope_base: float = 10000.0
+    use_sdpa: bool = False
 
 
 class Block(nn.Module):
@@ -28,13 +29,20 @@ class Block(nn.Module):
         super().__init__()
         self.attn_norm = RMSNorm(cfg.d_model)
         self.attn = MultiHeadAttention(
-            cfg.d_model, cfg.n_heads, cfg.n_kv_heads, cfg.max_seq_len, cfg.rope_base
+            cfg.d_model,
+            cfg.n_heads,
+            cfg.n_kv_heads,
+            cfg.max_seq_len,
+            cfg.rope_base,
+            cfg.use_sdpa,
         )
         self.mlp_norm = RMSNorm(cfg.d_model)
         self.mlp = SwiGLU(cfg.d_model, cfg.mlp_hidden)
 
     def forward(self, x: torch.Tensor, cache: KVCache | None = None) -> torch.Tensor:
-        x = x + self.attn(self.attn_norm(x), cache)  # gather information from other positions
+        x = x + self.attn(
+            self.attn_norm(x), cache
+        )  # gather information from other positions
         x = x + self.mlp(self.mlp_norm(x))  # process it, per position
         return x
 
@@ -63,7 +71,10 @@ class GPT(nn.Module):
             nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
     def forward(
-        self, ids: torch.Tensor, targets: torch.Tensor | None = None, caches: list[KVCache] | None = None
+        self,
+        ids: torch.Tensor,
+        targets: torch.Tensor | None = None,
+        caches: list[KVCache] | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
         x = self.tok_emb(ids)  # [B, T] → [B, T, C]
         for i, block in enumerate(self.blocks):
@@ -82,5 +93,9 @@ class GPT(nn.Module):
 
     def new_caches(self, batch_size: int, device) -> list[KVCache]:
         head_dim = self.cfg.d_model // self.cfg.n_heads
-        return [KVCache(batch_size, self.cfg.n_kv_heads, self.cfg.max_seq_len, head_dim, device)
-                for _ in self.blocks]
+        return [
+            KVCache(
+                batch_size, self.cfg.n_kv_heads, self.cfg.max_seq_len, head_dim, device
+            )
+            for _ in self.blocks
+        ]
