@@ -49,6 +49,7 @@ class MultiHeadAttention(nn.Module):
         max_seq_len: int = 1024,
         rope_base: float = 10000.0,
         use_sdpa: bool = False,
+        qkv_bias: bool = False,
     ):
         super().__init__()
         n_kv_heads = n_kv_heads or n_heads
@@ -61,9 +62,9 @@ class MultiHeadAttention(nn.Module):
         cos, sin = rope_cache(max_seq_len, self.head_dim, rope_base)
         self.register_buffer("rope_cos", cos, persistent=False)
         self.register_buffer("rope_sin", sin, persistent=False)
-        self.q_proj = nn.Linear(d_model, n_heads * self.head_dim, bias=False)
-        self.k_proj = nn.Linear(d_model, n_kv_heads * self.head_dim, bias=False)
-        self.v_proj = nn.Linear(d_model, n_kv_heads * self.head_dim, bias=False)
+        self.q_proj = nn.Linear(d_model, n_heads * self.head_dim, bias=qkv_bias)
+        self.k_proj = nn.Linear(d_model, n_kv_heads * self.head_dim, bias=qkv_bias)
+        self.v_proj = nn.Linear(d_model, n_kv_heads * self.head_dim, bias=qkv_bias)
         self.o_proj = nn.Linear(n_heads * self.head_dim, d_model, bias=False)
         # interpretability hooks (plain attributes: not parameters, not saved in checkpoints)
         self.head_mask: torch.Tensor | None = None  # [n_heads]; 0 switches a head off

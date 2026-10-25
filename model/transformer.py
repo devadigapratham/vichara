@@ -22,6 +22,7 @@ class GPTConfig:
     max_seq_len: int = 512
     rope_base: float = 10000.0
     use_sdpa: bool = False
+    qkv_bias: bool = False
 
 
 class Block(nn.Module):
@@ -35,6 +36,7 @@ class Block(nn.Module):
             cfg.max_seq_len,
             cfg.rope_base,
             cfg.use_sdpa,
+            cfg.qkv_bias,
         )
         self.mlp_norm = RMSNorm(cfg.d_model)
         self.mlp = SwiGLU(cfg.d_model, cfg.mlp_hidden)

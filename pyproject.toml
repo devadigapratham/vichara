@@ -3,7 +3,7 @@ name = "vichara"
 version = "0.0.1"
 description = "A reasoning language model built from scratch, for learning and research"
 requires-python = ">=3.11"
-dependencies = ["torch>=2.4", "numpy", "regex"]
+dependencies = ["torch>=2.4", "numpy", "regex", "safetensors", "huggingface_hub"]
 
 [project.optional-dependencies]
 dev = ["pytest"]
