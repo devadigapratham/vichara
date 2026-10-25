@@ -19,7 +19,8 @@ The goal is to understand every layer of the stack, not just to train a model: t
 | ✅ | SwiGLU MLP + full GPT model | `model/transformer.py` | 14.16M params; tied embeddings; parameter count derived by hand |
 | ✅ | AdamW + warmup/cosine schedule | `training/optim.py` | AdamW written from scratch; matches `torch.optim.AdamW` |
 | ✅ | Training loop | `training/pretrain.py` | clipping, accumulation, resumable atomic checkpoints (crash and resume give a bit-identical result) |
-| ✅ | Pretraining on TinyStories | `checkpoints/` (not in git) | val loss **1.42** after 74M tokens (~1 h on an M4 Pro); writes coherent short stories |
+| ✅ | Pretraining on TinyStories | `checkpoints/` (not in git) | val loss **1.42** after 74M tokens (~1 h, M4 Pro); **1.23** after 283M tokens (~25 min on a Modal L4) |
+| ✅ | GPU path | `scripts/` | bf16 + fused attention + torch.compile: **6.6× faster** on an L4; training on Modal with persistent volumes and auto-resume |
 | ✅ | Generation + KV cache | `inference/generate.py` | temperature / top-k / top-p; KV cache 7× faster on CPU with identical outputs |
 | ⬜ | Reasoning, safety, interpretability, serving | | see [ROADMAP.md](ROADMAP.md) |
 

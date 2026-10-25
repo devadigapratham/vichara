@@ -3,6 +3,20 @@
 A reasoning language model built from scratch, from the math up to production.
 This file is the plan. Milestones are done only when every "Done when" item is true.
 
+## End point (what "finished" means)
+
+The project is finished when all five of these exist, each with its numbers measured and reproducible from the repo:
+
+1. **Two models, trained and evaluated with our own code**
+   - `vichara-tiny`: the 14M model trained from scratch on TinyStories (done: val 1.23 after 283M tokens), with its interpretability and safety studies.
+   - `vichara-reasoner`: Qwen2.5-0.5B loaded into our own model code and trained with our own GRPO on GSM8K, compared with published recipes (≥ 49.5 GSM8K target), with random-reward and format-only controls.
+2. **A deployed system** serving `vichara-reasoner` through our own inference engine (continuous batching, paged KV cache, INT8/INT4 quantization), behind a streaming API with auth, rate limits, input/output safety filters, monitoring, and eval-gated releases with rollback. Throughput compared against vLLM on the same GPU.
+3. **A safety and security dossier**: backdoor attack + detection + internals (done), membership inference, reward-hacking monitors during RL, refusal/over-refusal and jailbreak evaluations of the deployed model, and a model card.
+4. **An interpretability dossier**: the name-tracking circuit (done), an SAE scored on SAEBench (Pythia-160M), and an analysis of what GRPO changed inside the model.
+5. **A public write-up**: a technical report (README + docs) stating every claim with its evidence, controls, and limits.
+
+**The real test (from the original brief):** for any component of a modern reasoning model (tokenizer, attention, positional encoding, MLP, training recipe, data, RL algorithm, safety approach, interpretability method, inference engine, KV cache, quantization, distributed strategy, serving, monitoring), you can explain *why it's designed that way* and build it yourself.
+
 ## Resources (designed around these)
 
 | Resource                                    | What it is                   | What we use it for                                          |
@@ -67,7 +81,7 @@ Each project makes a **narrow, verifiable claim** against published numbers unde
 
 **Phase 0 · Shared infrastructure** (needed by all three): GPU path on Kaggle (free T4) and Modal; bf16/fp16 autocast, SDPA/FlashAttention, torch.compile, each speedup measured; a shared evaluation harness and experiment tracking.
 
-**Project 1 · BabyLM Strict-Small: a model trained entirely from scratch**
+**Project 1 · BabyLM Strict-Small** (dropped 2026-10-25 by the user's choice; research kept in docs/lessons/research_babylm_2026.md)
 - Rules: ≤ 10M words of training data, ≤ 10 epochs, no compute cap; data swaps allowed in the 2026 edition.
 - Bar (2025 results): GPT-2 baseline 49.1 · GPT-BERT-causal ≈ 56.4 · winner 58.3 (masked model).
 - Plan: a ~30M causal decoder (ours), then ablate speedrun techniques (Muon, QK-norm, ReLU², value embeddings, softcap). Secondary score: FineWeb bits-per-byte against pythia-14m/31m.
