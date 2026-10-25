@@ -132,3 +132,38 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+@torch.no_grad()
+def generate_batch(model, prompts: list[list[int]], max_new_tokens: int, eos_id: int, pad_id: int = 0,
+                   temperature: float = 0.0, top_p: float | None = None, generator=None,
+                   n_valid: int | None = None) -> list[list[int]]:
+    model.eval()
+    device = next(model.parameters()).device
+    batch, width = len(prompts), max(len(p) for p in prompts)
+    assert width + max_new_tokens <= model.cfg.max_seq_len, "prompt + new tokens exceed max_seq_len"
+    ids = torch.full((batch, width), pad_id, dtype=torch.long)
+    mask = torch.zeros(batch, width, dtype=torch.long)
+    for i, p in enumerate(prompts):
+        ids[i, width - len(p):] = torch.tensor(p)
+        mask[i, width - len(p):] = 1
+    ids, mask = ids.to(device), mask.to(device)
+
+    caches = model.new_caches(batch, device)
+    logits, _ = model(ids, caches=caches, attention_mask=mask, last_only=True)
+    out = []
+    done = torch.zeros(batch, dtype=torch.bool, device=device)
+    for step in range(max_new_tokens):
+        nxt = sample_next(logits[:, -1, :n_valid].float(), temperature, top_p=top_p, generator=generator)
+        nxt = nxt.masked_fill(done[:, None], pad_id)
+        out.append(nxt)
+        mask = torch.cat([mask, (~done).long()[:, None]], dim=1)
+        done = done | (nxt[:, 0] == eos_id)
+        if done.all() or step == max_new_tokens - 1:
+            break
+        logits, _ = model(nxt, caches=caches, attention_mask=mask)
+    out = torch.cat(out, dim=1).tolist()
+    results = []
+    for row in out:
+        results.append(row[: row.index(eos_id) + 1] if eos_id in row else row)
+    return results
