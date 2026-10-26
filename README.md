@@ -22,7 +22,9 @@ The goal is to understand every layer of the stack, not just to train a model: t
 | ✅ | Pretraining on TinyStories | `checkpoints/` (not in git) | val loss **1.42** after 74M tokens (~1 h, M4 Pro); **1.23** after 283M tokens (~25 min on a Modal L4) |
 | ✅ | GPU path | `scripts/` | bf16 + fused attention + torch.compile: **6.6× faster** on an L4; training on Modal with persistent volumes and auto-resume |
 | ✅ | Generation + KV cache | `inference/generate.py` | temperature / top-k / top-p; KV cache 7× faster on CPU with identical outputs |
-| ⬜ | Reasoning, safety, interpretability, serving | | see [ROADMAP.md](ROADMAP.md) |
+| ✅ | Qwen2.5-0.5B in our own code | `model/hf_import.py` | logits match Hugging Face to 3.5e-4; batched left-padded generation |
+| ✅ | GRPO on GSM8K | `training/grpo_lm.py`, `experiments/e15_grpo_qwen/` | **30.3% → 48.8%** zero-shot; format-only and random-reward controls stay at ~30% |
+| ⬜ | Safety, interpretability, serving | | see [ROADMAP.md](ROADMAP.md) |
 
 ## Results so far
 
@@ -51,6 +53,18 @@ The goal is to understand every layer of the stack, not just to train a model: t
 
 Sample (prompt: *"Once upon a time, a little dragon"*):
 > Once upon a time, a little dragon lived in a big forest. He had a very big, strong roar. All the other animals liked to listen to him. He liked to listen to them.
+
+**GSM8K with Qwen2.5-0.5B (base)**, greedy, full 1,319-problem test set:
+
+| setup | accuracy |
+|---|---|
+| zero-shot, "Let's think step by step." | 30.3% |
+| 4-shot | 39.1% |
+| GRPO, 150 steps, reward = correct answer | **48.8%** |
+| GRPO, 150 steps, reward = answer format only | 29.6% |
+| GRPO, 150 steps, random reward | 31.6% |
+
+The three GRPO runs differ only in the reward (16 problems × 8 samples per step, lr 1e-6, KL β 0.02, ~3 h each on one L4). The format-only run learns the requested ending ("The answer is N.") on 98% of answers and halves its answer length without solving more problems, so the gain in the correctness run comes from the correctness reward, not from formatting or from the update itself.
 
 ## Layout
 
