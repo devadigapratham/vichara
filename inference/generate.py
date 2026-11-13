@@ -167,3 +167,20 @@ def generate_batch(model, prompts: list[list[int]], max_new_tokens: int, eos_id:
     for row in out:
         results.append(row[: row.index(eos_id) + 1] if eos_id in row else row)
     return results
+
+
+@torch.no_grad()
+def stream_tokens(model, prompt: list[int], max_new_tokens: int, eos_id: int, temperature: float = 0.0,
+                  top_p: float | None = None, generator=None, n_valid: int | None = None):
+    model.eval()
+    device = next(model.parameters()).device
+    assert len(prompt) + max_new_tokens <= model.cfg.max_seq_len, "prompt + new tokens exceed max_seq_len"
+    caches = model.new_caches(1, device)
+    logits, _ = model(torch.tensor([prompt], device=device), caches=caches, last_only=True)
+    for step in range(max_new_tokens):
+        nxt = sample_next(logits[:, -1, :n_valid].float(), temperature, top_p=top_p, generator=generator)
+        token = nxt.item()
+        yield token
+        if token == eos_id or step == max_new_tokens - 1:
+            return
+        logits, _ = model(nxt, caches=caches)
