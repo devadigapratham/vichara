@@ -15,6 +15,20 @@ The project is finished when all five of these exist, each with its numbers meas
 4. **An interpretability dossier**: the name-tracking circuit (done), an SAE scored on SAEBench (Pythia-160M), and an analysis of what GRPO changed inside the model.
 5. **A public write-up**: a technical report (README + docs) stating every claim with its evidence, controls, and limits.
 
+### v1.0 (revised scope)
+
+The full list above is several more weeks of work. v1.0 ships a shorter version:
+
+| | item | status |
+|---|---|---|
+| R4 | pass@k, base vs GRPO: did RL sharpen or expand? | done (e16): no convergence up to k = 8 |
+| I4 | what GRPO changed inside the model | done (e18): early MLPs |
+| S4 | a reward-hacking monitor, tested on the format-only GRPO run | done (e17) |
+| D | a small streaming demo API for `vichara-reasoner` | done (`inference/server.py`) |
+| W | technical report + model card, tagged v1.0 | done (README, MODEL_CARD.md) |
+
+Out of scope for v1.0, listed as future work: our own inference engine (continuous batching, paged KV), quantization, the vLLM comparison, SAEs on SAEBench, membership inference, refusal and jailbreak evaluations.
+
 **The real test (from the original brief):** for any component of a modern reasoning model (tokenizer, attention, positional encoding, MLP, training recipe, data, RL algorithm, safety approach, interpretability method, inference engine, KV cache, quantization, distributed strategy, serving, monitoring), you can explain *why it's designed that way* and build it yourself.
 
 ## Resources (designed around these)
