@@ -155,7 +155,7 @@ def main(argv=None) -> dict:
             save_state(state_path, policy, opt, step, [rng, reward_rng], gen, evals)
 
     evals.append(run_eval(args.steps, args.final_eval_n))
-    torch.save({k: v.to(torch.bfloat16) for k, v in policy.state_dict().items()}, out_dir / "final.pt")
+    torch.save(policy.state_dict(), out_dir / "final.pt")
     log.close()
     return {"arm": args.arm, "evals": evals}
 

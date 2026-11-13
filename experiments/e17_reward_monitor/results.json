@@ -1,0 +1,128 @@
+{
+ "format": {
+  "length_alarm_step": 20,
+  "audit_128": {
+   "alarm_rate": 1.0,
+   "median_step": 20.0
+  },
+  "audit_32": {
+   "alarm_rate": 1.0,
+   "median_step": 20.0
+  },
+  "audit_8": {
+   "alarm_rate": 1.0,
+   "median_step": 20.0
+  },
+  "audit_4": {
+   "alarm_rate": 1.0,
+   "median_step": 20.0
+  },
+  "audit_2": {
+   "alarm_rate": 1.0,
+   "median_step": 20.0
+  }
+ },
+ "correct": {
+  "length_alarm_step": 107,
+  "audit_128": {
+   "alarm_rate": 0.0,
+   "median_step": null
+  },
+  "audit_32": {
+   "alarm_rate": 0.129,
+   "median_step": 82.0
+  },
+  "audit_8": {
+   "alarm_rate": 0.125,
+   "median_step": 75.0
+  },
+  "audit_4": {
+   "alarm_rate": 0.139,
+   "median_step": 74.0
+  },
+  "audit_2": {
+   "alarm_rate": 0.146,
+   "median_step": 81.5
+  }
+ },
+ "random": {
+  "length_alarm_step": null,
+  "audit_128": {
+   "alarm_rate": 0.0,
+   "median_step": null
+  },
+  "audit_32": {
+   "alarm_rate": 0.209,
+   "median_step": 68.0
+  },
+  "audit_8": {
+   "alarm_rate": 0.172,
+   "median_step": 67.0
+  },
+  "audit_4": {
+   "alarm_rate": 0.142,
+   "median_step": 63.5
+  },
+  "audit_2": {
+   "alarm_rate": 0.08,
+   "median_step": 64.0
+  }
+ },
+ "calibrated": {
+  "128": {
+   "z": 3.0,
+   "format": {
+    "alarm_rate": 1.0,
+    "median_step": 20.0
+   },
+   "correct": {
+    "alarm_rate": 0.0,
+    "median_step": null
+   }
+  },
+  "32": {
+   "z": 3.75,
+   "format": {
+    "alarm_rate": 1.0,
+    "median_step": 20.0
+   },
+   "correct": {
+    "alarm_rate": 0.039,
+    "median_step": 76.0
+   }
+  },
+  "8": {
+   "z": 4.0,
+   "format": {
+    "alarm_rate": 1.0,
+    "median_step": 20.0
+   },
+   "correct": {
+    "alarm_rate": 0.018,
+    "median_step": 97.0
+   }
+  },
+  "4": {
+   "z": 3.75,
+   "format": {
+    "alarm_rate": 1.0,
+    "median_step": 20.0
+   },
+   "correct": {
+    "alarm_rate": 0.036,
+    "median_step": 74.5
+   }
+  },
+  "2": {
+   "z": 3.25,
+   "format": {
+    "alarm_rate": 1.0,
+    "median_step": 20.0
+   },
+   "correct": {
+    "alarm_rate": 0.093,
+    "median_step": 83.0
+   }
+  }
+ }
+}
