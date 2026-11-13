@@ -21,7 +21,7 @@ def decode(ids):
 
 
 def client(per_minute=100):
-    app = create_app(tiny(), lambda s: [1, 2, 3], decode, EOS, {"k"}, per_minute)
+    app = create_app({"reasoner": tiny(), "base": tiny()}, lambda s: [1, 2, 3], decode, EOS, {"k"}, per_minute)
     return TestClient(app)
 
 
@@ -92,3 +92,12 @@ def test_stream_and_metrics():
     assert len(text) <= ev[-1]["tokens"]
     m = c.get("/metrics", headers=h).json()
     assert m["completed"] == 1 and m["tokens"] == ev[-1]["tokens"]
+
+
+def test_model_choice_and_demo_page():
+    c = client()
+    h = {"X-API-Key": "k"}
+    assert c.post("/v1/solve", json={"question": "2+2?", "model": "base", "max_new_tokens": 3}, headers=h).status_code == 200
+    assert c.post("/v1/solve", json={"question": "2+2?", "model": "gpt5"}, headers=h).status_code == 400
+    page = c.get("/")
+    assert page.status_code == 200 and "text/html" in page.headers["content-type"]

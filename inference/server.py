@@ -4,6 +4,9 @@
 
     curl -N -H "X-API-Key: key1" -H "Content-Type: application/json" \
          -d '{"question": "Tom has 3 apples and buys 5 more. How many does he have?"}' localhost:8000/v1/solve
+
+With --compare the base model is served too ("model": "base"), and http://localhost:8000/?key=key1
+races the two side by side.
 """
 
 import argparse
@@ -17,14 +20,15 @@ from pathlib import Path
 
 import torch
 from fastapi import FastAPI, Header, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from inference.generate import stream_tokens  # noqa: E402
 from reasoning.gsm8k_rl import PROMPT  # noqa: E402
 
-STOPS = ["\nQuestion:", "\nYou are an AI", "\nHuman:", "\nUser:", "<|endoftext|>"]
+DEMO = Path(__file__).with_name("demo.html")
+STOPS = ["\nQuestion:", "\n--", "\nYou are an AI", "\nHuman:", "\nUser:", "<|endoftext|>"]
 MAX_QUESTION_CHARS = 2000
 
 
@@ -69,14 +73,16 @@ class RateLimiter:
 
 class Solve(BaseModel):
     question: str = Field(min_length=1)
+    model: str = "reasoner"
     max_new_tokens: int = Field(default=300, ge=1, le=600)
     temperature: float = Field(default=0.0, ge=0.0, le=2.0)
 
 
-def create_app(model, encode, decode, eos_id: int, api_keys: set[str], per_minute: int = 20,
+def create_app(models: dict, encode, decode, eos_id: int, api_keys: set[str], per_minute: int = 20,
                n_valid: int | None = None) -> FastAPI:
     app = FastAPI(title="vichara-reasoner")
-    limiter, lock = RateLimiter(per_minute), threading.Lock()
+    limiter = RateLimiter(per_minute)
+    gpu = threading.Lock()  # MPS can't run two models from two threads at once; take turns per token
     metrics = {"requests": 0, "rejected_auth": 0, "rejected_rate": 0, "rejected_input": 0,
                "completed": 0, "tokens": 0, "first_token_s": 0.0, "total_s": 0.0}
 
@@ -91,22 +97,28 @@ def create_app(model, encode, decode, eos_id: int, api_keys: set[str], per_minut
         if len(body.question) > MAX_QUESTION_CHARS or "<|" in body.question:
             metrics["rejected_input"] += 1
             raise HTTPException(400, "question too long or contains reserved token syntax")
+        if body.model not in models:
+            metrics["rejected_input"] += 1
+            raise HTTPException(400, f"unknown model; available: {sorted(models)}")
 
     def events(body):
+        model = models[body.model]
         prompt = encode(PROMPT.format(question=body.question))
         budget = min(body.max_new_tokens, model.cfg.max_seq_len - len(prompt))
         stop, ids, t0, first = StopFilter(), [], time.perf_counter(), None
-        with lock:
-            for token in stream_tokens(model, prompt, budget, eos_id, body.temperature, n_valid=n_valid):
-                if token == eos_id:
-                    break
-                ids.append(token)
-                first = first or time.perf_counter() - t0
-                delta = stop.push(decode(ids))
-                if delta:
-                    yield f"data: {json.dumps({'text': delta})}\n\n"
-                if stop.stopped:
-                    break
+        tokens = stream_tokens(model, prompt, budget, eos_id, body.temperature, n_valid=n_valid)
+        while True:
+            with gpu:
+                token = next(tokens, None)
+            if token is None or token == eos_id:
+                break
+            ids.append(token)
+            first = first or time.perf_counter() - t0
+            delta = stop.push(decode(ids))
+            if delta:
+                yield f"data: {json.dumps({'text': delta})}\n\n"
+            if stop.stopped:
+                break
         tail = "" if stop.stopped else stop.push(decode(ids), final=True)
         if tail:
             yield f"data: {json.dumps({'text': tail})}\n\n"
@@ -123,7 +135,11 @@ def create_app(model, encode, decode, eos_id: int, api_keys: set[str], per_minut
 
     @app.get("/health")
     def health():
-        return {"ok": True}
+        return {"ok": True, "models": sorted(models)}
+
+    @app.get("/", response_class=HTMLResponse)
+    def demo():
+        return DEMO.read_text()
 
     @app.get("/metrics")
     def get_metrics(x_api_key: str | None = Header(default=None)):
@@ -149,6 +165,7 @@ def main():
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8000)
     p.add_argument("--per-minute", type=int, default=20)
+    p.add_argument("--compare", action="store_true", help="also serve the base model, for side-by-side demos")
     p.add_argument("--device", default="auto")
     args = p.parse_args()
 
@@ -159,9 +176,11 @@ def main():
     model = load_qwen2(args.model)
     if args.weights:
         model.load_state_dict(torch.load(args.weights, map_location="cpu"))
-    model = model.to(device).eval()
+    models = {"reasoner": model.to(device).eval()}
+    if args.compare:
+        models["base"] = load_qwen2(args.model).to(device).eval()
     tok = Tokenizer.from_file(str(Path(args.model) / "tokenizer.json"))
-    app = create_app(model, lambda s: tok.encode(s).ids, tok.decode, tok.token_to_id("<|endoftext|>"),
+    app = create_app(models, lambda s: tok.encode(s).ids, tok.decode, tok.token_to_id("<|endoftext|>"),
                      keys, args.per_minute, n_valid=tok.get_vocab_size())
     uvicorn.run(app, host=args.host, port=args.port)
 

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vichara-reasoner</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #07080c; --panel: rgba(255,255,255,0.04); --line: rgba(255,255,255,0.09);
+    --ink: #f4f4f6; --muted: #8b8f9c; --hot1: #ff7a18; --hot2: #ff2d6f; --good: #3ddc97; --bad: #ff5c6c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh; font-family: Inter, sans-serif; color: var(--ink);
+    background:
+      radial-gradient(900px 600px at 15% 100%, rgba(255, 90, 40, 0.13), transparent 60%),
+      radial-gradient(700px 500px at 95% 0%, rgba(255, 45, 111, 0.09), transparent 60%),
+      var(--bg);
+  }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 44px 32px 40px; }
+  .kicker { font-family: "JetBrains Mono", monospace; font-size: 13px; letter-spacing: 0.14em; color: var(--muted);
+            text-transform: uppercase; display: flex; align-items: center; gap: 10px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--hot1); box-shadow: 0 0 12px var(--hot1); }
+  h1 { font-size: 44px; font-weight: 900; letter-spacing: -0.03em; margin-top: 14px; }
+  h1 .grad { background: linear-gradient(90deg, var(--hot1), var(--hot2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sub { color: var(--muted); font-size: 17px; margin-top: 8px; }
+
+  .ask { margin-top: 28px; display: flex; gap: 12px; }
+  textarea {
+    flex: 1; resize: none; height: 64px; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--ink); font: 500 16.5px/1.45 Inter, sans-serif; outline: none;
+  }
+  textarea:focus { border-color: rgba(255, 122, 24, 0.6); }
+  button.run {
+    width: 132px; border: 0; border-radius: 14px; cursor: pointer; color: white; font: 800 17px Inter, sans-serif;
+    background: linear-gradient(90deg, var(--hot1), var(--hot2)); box-shadow: 0 0 30px rgba(255, 70, 70, 0.35);
+  }
+  button.run:disabled { opacity: 0.5; cursor: default; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chip {
+    border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 999px;
+    padding: 7px 13px; font: 500 13.5px Inter, sans-serif; cursor: pointer;
+  }
+  .chip:hover { color: var(--ink); border-color: rgba(255,255,255,0.25); }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 26px; }
+  .col { border-radius: 18px; border: 1px solid var(--line); background: var(--panel); padding: 20px 22px; min-height: 380px;
+         display: flex; flex-direction: column; }
+  .col.rl { border-color: rgba(255, 90, 60, 0.45); box-shadow: 0 0 50px rgba(255, 70, 70, 0.12); }
+  .head { display: flex; justify-content: space-between; align-items: center; }
+  .name { font-weight: 800; font-size: 18px; }
+  .name small { display: block; color: var(--muted); font-weight: 500; font-size: 13px; margin-top: 2px; }
+  .rl .name .grad { background: linear-gradient(90deg, var(--hot1), var(--hot2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .stats { font-family: "JetBrains Mono", monospace; font-size: 12.5px; color: var(--muted); text-align: right; }
+  .out { margin-top: 16px; flex: 1; font: 400 15.5px/1.65 "JetBrains Mono", monospace; color: #d9dbe2; white-space: pre-wrap; }
+  .out .cursor { display: inline-block; width: 8px; height: 17px; background: var(--hot1); vertical-align: -3px; animation: blink 0.9s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .verdict { margin-top: 14px; font: 800 20px Inter, sans-serif; display: none; align-items: center; gap: 10px; }
+  .verdict.show { display: flex; }
+  .verdict .pill { font-size: 14px; padding: 5px 11px; border-radius: 999px; }
+  .verdict.good { color: var(--good); } .verdict.good .pill { background: rgba(61, 220, 151, 0.14); }
+  .verdict.bad { color: var(--bad); } .verdict.bad .pill { background: rgba(255, 92, 108, 0.14); }
+  .foot { margin-top: 22px; color: #5d6170; font: 12.5px "JetBrains Mono", monospace; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker"><span class="dot"></span>vichara · GRPO on Qwen2.5-0.5B · GSM8K</div>
+  <h1>Same model. <span class="grad">Before and after RL.</span></h1>
+  <p class="sub">Both answer the same question at the same time, greedy decoding, streamed token by token.</p>
+
+  <div class="ask">
+    <textarea id="q" placeholder="Ask a grade-school maths word problem..."></textarea>
+    <button class="run" id="run">Run</button>
+  </div>
+  <div class="chips" id="chips"></div>
+
+  <div class="grid">
+    <div class="col" id="col-base">
+      <div class="head"><div class="name">Qwen2.5-0.5B<small>base model</small></div><div class="stats" id="stats-base"></div></div>
+      <div class="out" id="out-base"></div>
+      <div class="verdict" id="v-base"></div>
+    </div>
+    <div class="col rl" id="col-reasoner">
+      <div class="head"><div class="name"><span class="grad">vichara-reasoner</span><small>after 150 steps of GRPO</small></div><div class="stats" id="stats-reasoner"></div></div>
+      <div class="out" id="out-reasoner"></div>
+      <div class="verdict" id="v-reasoner"></div>
+    </div>
+  </div>
+  <div class="foot">Model code, training and GRPO written from scratch. Running locally.</div>
+</div>
+
+<script>
+  const PRESETS = [
+    { label: "football games", q: "A football team played 22 games. They won 8 more than they lost. How many did they win?", gold: "15" },
+    { label: "robe fiber", q: "A robe takes 2 bolts of blue fiber and half that much white fiber.  How many bolts in total does it take?", gold: "3" },
+    { label: "Pancho's walks", q: "Pancho walks 20 miles a day. Except on weekends when he walks 10 miles. How many miles does he walk in a week?", gold: "120" },
+    { label: "Gretchen's coins", q: "Gretchen has 110 coins. There are 30 more gold coins than silver coins. How many gold coins does Gretchen have?", gold: "70" },
+  ];
+  const key = new URLSearchParams(location.search).get("key") || "";
+  const $ = id => document.getElementById(id);
+  let gold = null;
+
+  PRESETS.forEach(p => {
+    const b = document.createElement("button");
+    b.className = "chip"; b.textContent = p.label;
+    b.onclick = () => { $("q").value = p.q; gold = p.gold; };
+    $("chips").appendChild(b);
+  });
+  $("q").addEventListener("input", () => { gold = null; });
+
+  const lastNumber = text => {
+    const m = text.replace(/,/g, "").match(/-?\d+(?:\.\d+)?/g);
+    return m ? String(+m[m.length - 1]) : null;
+  };
+
+  async function stream(model, question) {
+    const out = $("out-" + model), stats = $("stats-" + model), verdict = $("v-" + model);
+    out.innerHTML = '<span class="cursor"></span>'; stats.textContent = ""; verdict.className = "verdict";
+    const t0 = performance.now();
+    let text = "", tokens = 0;
+    const res = await fetch("/v1/solve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-API-Key": key },
+      body: JSON.stringify({ question, model, temperature: 0 }),
+    });
+    if (!res.ok) { out.textContent = `error ${res.status}: ${await res.text()}`; return; }
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const parts = buf.split("\n\n"); buf = parts.pop();
+      for (const part of parts) {
+        if (!part.startsWith("data: ")) continue;
+        const ev = JSON.parse(part.slice(6));
+        if (ev.text) { text += ev.text; out.textContent = text.trimStart(); out.insertAdjacentHTML("beforeend", '<span class="cursor"></span>'); }
+        if (ev.done) tokens = ev.tokens;
+      }
+      stats.textContent = `${((performance.now() - t0) / 1000).toFixed(1)}s`;
+    }
+    out.textContent = text.trim();
+    stats.textContent = `${tokens} tokens · ${((performance.now() - t0) / 1000).toFixed(1)}s`;
+    const ans = lastNumber(text);
+    if (gold !== null && ans !== null) {
+      const ok = ans === String(+gold);
+      verdict.className = "verdict show " + (ok ? "good" : "bad");
+      verdict.innerHTML = `${ok ? "✓" : "✗"} answer: ${ans}<span class="pill">${ok ? "correct" : "correct answer is " + gold}</span>`;
+    }
+  }
+
+  $("run").onclick = async () => {
+    const q = $("q").value.trim();
+    if (!q) return;
+    $("run").disabled = true;
+    await Promise.all([stream("base", q), stream("reasoner", q)]);
+    $("run").disabled = false;
+  };
+  $("q").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("run").click(); } });
+
+  const auto = new URLSearchParams(location.search).get("demo");
+  if (auto !== null && PRESETS[+auto]) {
+    $("q").value = PRESETS[+auto].q; gold = PRESETS[+auto].gold;
+    setTimeout(() => $("run").click(), 1500);
+  }
+</script>
+</body>
+</html>
